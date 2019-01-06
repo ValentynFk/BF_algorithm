@@ -105,7 +105,6 @@ int main()
 		}
 		std::cout << '\n';
 	} std::cout << '\b' << std::endl;
-	std::cout << "tp1 < tp2: " << std::boolalpha << (bool)(tp1 < tp2) << std::noboolalpha << std::endl;
 	auto diff = tp2 - tp1;
 	std::cout << "time on execution: " << std::chrono::duration_cast<std::chrono::microseconds>(diff).count() << std::endl;
 	return EXIT_SUCCESS;
