@@ -1,8 +1,10 @@
-#include "pch.h"
+#include "pch.h" // for precompiled libraries NO NEED!
 #include <iostream>
 #include <string>
 #include <vector>
 #include <algorithm>
+#include <chrono>
+#include <regex>
 
 size_t distance(
 	const std::string & current_node, const std::string & node2,
@@ -51,9 +53,35 @@ std::vector<std::vector<size_t>> BF_algorithm(
 	return d_matrix;
 }
 
+std::vector< std::pair<std::string, std::vector<std::string>> > json2connections(std::string json_str)
+{
+	std::vector< std::pair<std::string, std::vector<std::string>> > serialized;
+	std::regex curved_braces(R"raw(^[{]{1}[ \t]*(.*)[ \t]*[}]{1}$)raw");
+	std::regex connections(R"raw("[ \t]*([^"]*)"[ ]*:[ ]*[\[]{1}[ ]*([^\]]*)[ ]*[\]]{1}[,]?[ \t]*)raw");
+	std::regex node(R"raw([ \t]*"([^"]*)"[,]?)raw");
+	std::smatch captured_parts;
+	if (!std::regex_search(json_str, captured_parts, curved_braces)) { return serialized; }
+	json_str = captured_parts.str(1);
+	std::sregex_iterator end;
+	std::sregex_iterator pos(json_str.cbegin(), json_str.cend(), connections);
+	for (; pos != end; ++pos) {
+		std::vector<std::string> connected_nodes;
+		std::string substr(pos->str(2));
+		std::sregex_iterator sub_pos(substr.cbegin(), substr.cend(), node);
+		for (; sub_pos != end; ++sub_pos) {
+			connected_nodes.push_back(sub_pos->str(1));
+		}
+		serialized.push_back(std::make_pair(pos->str(1), connected_nodes));
+	}
+	return serialized;
+}
+
 int main()
 {
 	std::vector< std::pair<std::string, std::vector<std::string>> > connections;
+	std::vector<std::vector<size_t>> d_matrix;
+	std::chrono::system_clock::time_point tp1;
+	std::chrono::system_clock::time_point tp2;
 	/* Next fill the connections map with actual connections in a form { 'node' -> [nodes, connected to it] }
 	{ 
 	  "node1" : ["node2", "node3", "node4", "node5"],
@@ -65,16 +93,20 @@ int main()
 	}
 	Just like in JSON, instead of node names there can be IPv6 addresses or something else.
 	*/
-	connections.push_back(std::make_pair(std::string("1"), std::vector<std::string>({ std::string("2"), std::string("3"), std::string("4"), std::string("5") })));
-	connections.push_back(std::make_pair(std::string("2"), std::vector<std::string>({ std::string("1"), std::string("3") })));
-	connections.push_back(std::make_pair(std::string("3"), std::vector<std::string>({ std::string("1"), std::string("2"), std::string("4") })));
-	connections.push_back(std::make_pair(std::string("4"), std::vector<std::string>({ std::string("1"), std::string("3"), std::string("5") })));
-	connections.push_back(std::make_pair(std::string("5"), std::vector<std::string>({ std::string("1"), std::string("4"), std::string("6") })));
-	connections.push_back(std::make_pair(std::string("6"), std::vector<std::string>({ std::string("5") })));
-	for (const auto & row : BF_algorithm(connections)) {
+	std::string json_connections_map(R"raw({  "node1" : ["node2","node3","node4","node5"], "node2" : ["node1","node3"], "node3" : ["node1","node2","node4"], "node4" : ["node1","node3","node5"], "node5" : ["node1","node4","node6"], "node6" : ["node5"]  })raw");
+	connections = json2connections(json_connections_map);
+
+	tp1 = std::chrono::system_clock::now();	// set timepoint 1
+	d_matrix = BF_algorithm(connections);
+	tp2 = std::chrono::system_clock::now();	// set timepoint 2
+	for (const auto & row : d_matrix) {
 		for (const auto & cell : row) {
 			std::cout << cell << '\t';
 		}
 		std::cout << '\n';
 	} std::cout << '\b' << std::endl;
+	std::cout << "tp1 < tp2: " << std::boolalpha << (bool)(tp1 < tp2) << std::noboolalpha << std::endl;
+	auto diff = tp2 - tp1;
+	std::cout << "time on execution: " << std::chrono::duration_cast<std::chrono::microseconds>(diff).count() << std::endl;
+	return EXIT_SUCCESS;
 }
